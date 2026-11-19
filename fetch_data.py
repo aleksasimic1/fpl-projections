@@ -44,7 +44,7 @@ DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-HORIZON = 5              # number of gameweeks for the long projection
+HORIZON = 20              # number of gameweeks for the long projection
 
 BASE = "https://fantasy.premierleague.com/api"
 HEADERS = {"User-Agent": "Mozilla/5.0 (fpl-projection-model)"}
