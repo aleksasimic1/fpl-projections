@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FPL Points Projections</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f5f2;
+    --surface: #ffffff;
+    --ink: #17231c;
+    --muted: #5d6b62;
+    --line: #dde3dd;
+    --accent: #0b6b3a;
+    --accent-soft: #e2f0e7;
+    --warn-red: #f6c9c9;
+    --warn-yellow: #fbebb0;
+    --row-hover: #f6f9f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1612;
+      --surface: #16201a;
+      --ink: #e7efe9;
+      --muted: #93a398;
+      --line: #263229;
+      --accent: #4fd08a;
+      --accent-soft: #1d3a2a;
+      --warn-red: #6b2323;
+      --warn-yellow: #6b5a1c;
+      --row-hover: #1b261f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 {
+    font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: 0.01em;
+    margin: 0 0 2px;
+  }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+
+  .filters {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .group + .group { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .group-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .group-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .link-btn {
+    background: none; border: 0; padding: 0; color: var(--accent);
+    font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline;
+  }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
+  .chip span {
+    display: block; padding: 4px 10px; border: 1px solid var(--line);
+    border-radius: 4px; font-weight: 500; font-size: 14px; color: var(--muted);
+    background: transparent; user-select: none;
+  }
+  .chip input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+  .chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 16px 0 8px; flex-wrap: wrap; }
+  .toolbar input[type="search"] {
+    font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--surface); color: var(--ink); width: 220px; max-width: 100%;
+  }
+  .count { color: var(--muted); font-size: 14px; }
+
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; }
+  th, td { padding: 8px 12px; text-align: left; white-space: nowrap; }
+  th {
+    position: sticky; top: 0; background: var(--surface);
+    border-bottom: 2px solid var(--line); font-weight: 600; font-size: 14px;
+    cursor: pointer; user-select: none;
+  }
+  th:hover { color: var(--accent); }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th .arrow { display: inline-block; width: 1em; color: var(--accent); }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody td { border-bottom: 1px solid var(--line); }
+  td.name { font-weight: 600; }
+  td.name.red { background: var(--warn-red); }
+  td.name.yellow { background: var(--warn-yellow); }
+  td.next5 { font-weight: 600; }
+  td.next1 { font-weight: 700; color: var(--accent); }
+  .empty { padding: 28px; text-align: center; color: var(--muted); }
+
+  .legend { display: flex; gap: 16px; margin-top: 12px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .error { background: var(--warn-red); padding: 14px 16px; border-radius: 6px; }
+  @media (max-width: 560px) {
+    body { padding: 16px 10px 36px; }
+    h1 { font-size: 28px; }
+    th, td { padding: 7px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FPL Points Projections</h1>
+  <p class="sub" id="meta">Loading data...</p>
+
+  <section class="filters" aria-label="Filters">
+    <div class="group">
+      <div class="group-head">
+        <h2>Teams</h2>
+        <button class="link-btn" data-action="teams-all">Select all</button>
+        <button class="link-btn" data-action="teams-none">Select none</button>
+      </div>
+      <div class="checks" id="team-checks"></div>
+    </div>
+    <div class="group">
+      <div class="group-head">
+        <h2>Positions</h2>
+        <button class="link-btn" data-action="pos-all">Select all</button>
+        <button class="link-btn" data-action="pos-none">Select none</button>
+      </div>
+      <div class="checks" id="pos-checks"></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Search player name" aria-label="Search player name">
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr id="head-row"></tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No players match the current filters.</div>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--warn-red)"></span>0% chance of playing</span>
+    <span><span class="swatch" style="background:var(--warn-yellow)"></span>Below 100% chance of playing</span>
+  </div>
+  <p class="note">Projections assume 90 minutes for every player. Players who averaged under 60 minutes over their last 5 games are given the default 2 points per fixture. Hover over a highlighted name for the injury news.</p>
+</div>
+
+<script>
+(function () {
+  var COLUMNS = [
+    { key: "name",  label: "Name",                     type: "text" },
+    { key: "team",  label: "Team",                     type: "text" },
+    { key: "pos",   label: "Position",                 type: "pos" },
+    { key: "opp",   label: "Next Opponent",            type: "text" },
+    { key: "next1", label: "Projected Pts (Next GW)",  type: "num" },
+    { key: "next5", label: "Projected Pts (Next 5 GWs)", type: "num" }
+  ];
+  var POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+  var POSITIONS = ["GK", "DEF", "MID", "FWD"];
+
+  var state = {
+    players: [],
+    teams: new Set(),
+    positions: new Set(POSITIONS),
+    sortKey: "next1",
+    sortDir: "desc",
+    query: ""
+  };
+
+  var el = {
+    meta: document.getElementById("meta"),
+    teamChecks: document.getElementById("team-checks"),
+    posChecks: document.getElementById("pos-checks"),
+    head: document.getElementById("head-row"),
+    body: document.getElementById("body"),
+    empty: document.getElementById("empty"),
+    count: document.getElementById("count"),
+    search: document.getElementById("search")
+  };
+
+  function chip(value, set, onChange) {
+    var label = document.createElement("label");
+    label.className = "chip";
+    var input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = value;
+    input.checked = set.has(value);
+    input.addEventListener("change", function () {
+      if (input.checked) set.add(value); else set.delete(value);
+      onChange();
+    });
+    var span = document.createElement("span");
+    span.textContent = value;
+    label.appendChild(input);
+    label.appendChild(span);
+    return label;
+  }
+
+  function setAll(container, set, values, on) {
+    set.clear();
+    if (on) values.forEach(function (v) { set.add(v); });
+    container.querySelectorAll("input").forEach(function (i) { i.checked = on; });
+    render();
+  }
+
+  function buildHead() {
+    el.head.innerHTML = "";
+    COLUMNS.forEach(function (c) {
+      var th = document.createElement("th");
+      th.scope = "col";
+      if (c.type === "num") th.className = "num";
+      th.setAttribute("aria-sort",
+        state.sortKey === c.key ? (state.sortDir === "asc" ? "ascending" : "descending") : "none");
+      var arrow = document.createElement("span");
+      arrow.className = "arrow";
+      arrow.textContent = state.sortKey === c.key ? (state.sortDir === "asc" ? "\u25B2" : "\u25BC") : "";
+      th.textContent = c.label + " ";
+      th.appendChild(arrow);
+      th.addEventListener("click", function () {
+        if (state.sortKey === c.key) {
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = c.key;
+          state.sortDir = c.type === "num" ? "desc" : "asc";
+        }
+        render();
+      });
+      el.head.appendChild(th);
+    });
+  }
+
+  function compare(a, b) {
+    var col = COLUMNS.filter(function (c) { return c.key === state.sortKey; })[0];
+    var x = a[state.sortKey], y = b[state.sortKey], r;
+    if (col.type === "num") r = x - y;
+    else if (col.type === "pos") r = POS_ORDER[x] - POS_ORDER[y];
+    else r = String(x).localeCompare(String(y), "en", { sensitivity: "base" });
+    if (state.sortDir === "desc") r = -r;
+    if (r === 0) r = b.next1 - a.next1;
+    if (r === 0) r = a.name.localeCompare(b.name);
+    return r;
+  }
+
+  function render() {
+    buildHead();
+    var q = state.query.trim().toLowerCase();
+    var rows = state.players.filter(function (p) {
+      return state.teams.has(p.team) && state.positions.has(p.pos) &&
+             (!q || p.name.toLowerCase().indexOf(q) !== -1);
+    }).sort(compare);
+
+    var frag = document.createDocumentFragment();
+    rows.forEach(function (p) {
+      var tr = document.createElement("tr");
+      var cells = [
+        ["name", p.name], ["", p.team], ["", p.pos], ["", p.opp],
+        ["num next1", p.next1.toFixed(2)], ["num next5", p.next5.toFixed(2)]
+      ];
+      cells.forEach(function (c, i) {
+        var td = document.createElement("td");
+        td.className = c[0];
+        td.textContent = c[1];
+        if (i === 0) {
+          if (p.chance === 0) td.className += " red";
+          else if (p.chance < 100) td.className += " yellow";
+          if (p.chance < 100) {
+            td.title = p.chance + "% chance of playing" + (p.news ? " \u2013 " + p.news : "");
+          }
+        }
+        tr.appendChild(td);
+      });
+      frag.appendChild(tr);
+    });
+    el.body.innerHTML = "";
+    el.body.appendChild(frag);
+    el.empty.hidden = rows.length > 0;
+    el.count.textContent = rows.length + " player" + (rows.length === 1 ? "" : "s");
+  }
+
+  function init(data) {
+    state.players = data.players;
+    data.teams.forEach(function (t) { state.teams.add(t); });
+
+    var when = new Date(data.generated_at);
+    el.meta.textContent = "Next gameweek: GW" + data.next_gw +
+      " \u00B7 Updated " + when.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+
+    data.teams.forEach(function (t) { el.teamChecks.appendChild(chip(t, state.teams, render)); });
+    POSITIONS.forEach(function (p) { el.posChecks.appendChild(chip(p, state.positions, render)); });
+
+    document.querySelector('[data-action="teams-all"]').addEventListener("click", function () {
+      setAll(el.teamChecks, state.teams, data.teams, true);
+    });
+    document.querySelector('[data-action="teams-none"]').addEventListener("click", function () {
+      setAll(el.teamChecks, state.teams, data.teams, false);
+    });
+    document.querySelector('[data-action="pos-all"]').addEventListener("click", function () {
+      setAll(el.posChecks, state.positions, POSITIONS, true);
+    });
+    document.querySelector('[data-action="pos-none"]').addEventListener("click", function () {
+      setAll(el.posChecks, state.positions, POSITIONS, false);
+    });
+    el.search.addEventListener("input", function () { state.query = el.search.value; render(); });
+
+    render();
+  }
+
+  fetch("data.json?v=" + Date.now())
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(init)
+    .catch(function (err) {
+      el.meta.className = "error";
+      el.meta.textContent = "Could not load data.json (" + err.message +
+        "). If you opened this file directly, run a local server instead: python -m http.server";
+    });
+})();
+</script>
+</body>
+</html>
