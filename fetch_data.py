@@ -23,8 +23,8 @@ W_SEASON = 0.80          # weight of season-long rates
 W_FORM = 0.20            # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
-W_XSTAT = 0.85           # weight of xG / xA ...
-W_ACTUAL = 0.15          # ... versus actual goals / assists
+W_XSTAT = 0.95          # weight of xG / xA ...
+W_ACTUAL = 0.05        # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
@@ -37,10 +37,10 @@ HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chanc
 
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
-CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
+CS_PTS = {"GK": 3, "DEF": 3, "MID": 0.75, "FWD": 0}
 BONUS_PTS = 1             # history bonus is already recorded as actual FPL bonus points
 DEFCON_PTS = 2
-DEFCON_MULTIPLIER = 0.75
+DEFCON_MULTIPLIER = 0.70
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
