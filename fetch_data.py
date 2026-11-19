@@ -23,15 +23,15 @@ W_SEASON = 0.80          # weight of season-long rates
 W_FORM = 0.20            # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
-W_XSTAT = 0.99          # weight of xG / xA ...
-W_ACTUAL = 0.30        # ... versus actual goals / assists
+W_XSTAT = 0.75          # weight of xG / xA ...
+W_ACTUAL = 0.25        # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
 OPP_EXPONENT = 0.5       # square root keeps the opponent effect mild
-OPP_MIN, OPP_MAX = 0.6, 1.4
+OPP_MIN, OPP_MAX = 0.5, 1.15
 HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
 
