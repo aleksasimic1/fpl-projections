@@ -20,14 +20,14 @@ from datetime import datetime, timezone
 # Model settings (tweak these)
 # ----------------------------------------------------------------------------
 W_SEASON = 0.70          # weight of season-long rates
-W_FORM = 0.30            # weight of recent form (last FORM_GAMES appearances in the history)
+W_FORM = 0.30            # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
 W_XSTAT = 0.80           # weight of xG / xA ...
 W_ACTUAL = 0.20          # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
-FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES games below this -> default points
+FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
 OPP_EXPONENT = 0.5       # square root keeps the opponent effect mild
@@ -38,6 +38,7 @@ HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chanc
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
+BONUS_PTS = 1             # history bonus is already recorded as actual FPL bonus points
 DEFCON_PTS = 2
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
@@ -146,22 +147,30 @@ def build_profile(p, history):
     s90 = 90.0 / minutes
     season_g = (W_XSTAT * f(p["expected_goals"]) + W_ACTUAL * p["goals_scored"]) * s90
     season_a = (W_XSTAT * f(p["expected_assists"]) + W_ACTUAL * p["assists"]) * s90
-    season_saves = p["saves"] * s90
 
-    # Appearances and defensive contributions from the match history
+    # Use actual appearances only for season/form appearance-based statistics.
     played = [h for h in history if h["minutes"] > 0]
+
     thr = DEFCON_THRESHOLD.get(pos)
     if thr and played:
-        season_dc = sum(1 for h in played if h.get("defensive_contribution", 0) >= thr) / len(played)
+        season_dc = sum(
+            1 for h in played
+            if h.get("defensive_contribution", 0) >= thr
+        ) / len(played)
     else:
         season_dc = 0.0
 
-    # Form: last FORM_GAMES rows of history (rows where the player's team played)
-    recent = history[-FORM_GAMES:]
+    # Bonus points per appearance, using season average and last five appearances.
+    season_bonus = (
+        sum(f(h.get("bonus", 0)) for h in played) / len(played)
+        if played else 0.0
+    )
+
+    recent = played[-FORM_GAMES:]
     recent_min = sum(h["minutes"] for h in recent)
     avg_recent_min = recent_min / len(recent) if recent else 0.0
 
-    form_g = form_a = form_saves = form_dc = None
+    form_g = form_a = form_saves = form_dc = form_bonus = None
     if recent_min > 0:
         s = 90.0 / recent_min
         form_g = (W_XSTAT * sum(f(h["expected_goals"]) for h in recent)
@@ -169,17 +178,27 @@ def build_profile(p, history):
         form_a = (W_XSTAT * sum(f(h["expected_assists"]) for h in recent)
                   + W_ACTUAL * sum(h["assists"] for h in recent)) * s
         form_saves = sum(h.get("saves", 0) for h in recent) * s
+
         recent_played = [h for h in recent if h["minutes"] > 0]
         if thr and recent_played:
-            form_dc = sum(1 for h in recent_played
-                          if h.get("defensive_contribution", 0) >= thr) / len(recent_played)
+            form_dc = sum(
+                1 for h in recent_played
+                if h.get("defensive_contribution", 0) >= thr
+            ) / len(recent_played)
+
+        if recent_played:
+            form_bonus = (
+                sum(f(h.get("bonus", 0)) for h in recent_played)
+                / len(recent_played)
+            )
 
     return {
         "pos": pos,
         "fringe": avg_recent_min < FRINGE_MIN_AVG,
         "g90": blend(season_g, form_g),
         "a90": blend(season_a, form_a),
-        "saves90": blend(season_saves, form_saves),
+        "saves90": blend(season_saves := p["saves"] * s90, form_saves),
+        "bonus": blend(season_bonus, form_bonus),
         "dc": blend(season_dc, form_dc if thr else None),
     }
 
@@ -187,9 +206,10 @@ def build_profile(p, history):
 # ----------------------------------------------------------------------------
 # Single-fixture projection
 # ----------------------------------------------------------------------------
-def project_fixture(prof, team_id, opp_id, home, attack, defence, avg_att, avg_def):
+def fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, avg_def):
+    """Return (points_by_component, diagnostics) for one fixture."""
     if prof["fringe"]:
-        return FRINGE_DEFAULT_PTS
+        return {"fringe_default": FRINGE_DEFAULT_PTS}, {}
 
     pos = prof["pos"]
     # Opponent defensive weakness (more xGC per game -> easier to score against)
@@ -202,13 +222,38 @@ def project_fixture(prof, team_id, opp_id, home, attack, defence, avg_att, avg_d
     assists = prof["a90"] * att_mult * boost * ASSIST_PTS
 
     lam = defence[team_id] * def_mult * (HOME_CS_FACTOR if home else 1.0)
+    # All players are assumed to play 90 minutes, so the FPL 60-minute
+    # clean-sheet eligibility condition is automatically satisfied.
     cs = math.exp(-lam) * CS_PTS[pos]
     gc_penalty = -expected_half_goals_conceded(lam) if pos in ("GK", "DEF") else 0.0
 
     defcon = prof["dc"] * DEFCON_PTS if pos != "GK" else 0.0
     saves = (prof["saves90"] * att_mult * boost / 3.0) if pos == "GK" else 0.0
+    bonus = prof["bonus"]
 
-    return APPEARANCE_PTS + goals + assists + cs + gc_penalty + defcon + saves
+    points = {
+        "appearance": APPEARANCE_PTS,
+        "goals": goals,
+        "assists": assists,
+        "clean_sheet": cs,
+        "goals_conceded": gc_penalty,
+        "defcon": defcon,
+        "saves": saves,
+        "bonus": bonus,
+    }
+    info = {
+        "att_mult": att_mult,
+        "def_mult": def_mult,
+        "boost": boost,
+        "lambda_conceded": lam,
+        "p_clean_sheet": math.exp(-lam),
+    }
+    return points, info
+
+
+def project_fixture(prof, team_id, opp_id, home, attack, defence, avg_att, avg_def):
+    points, _ = fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, avg_def)
+    return sum(points.values())
 
 
 # ----------------------------------------------------------------------------
@@ -253,7 +298,7 @@ def main():
         upcoming[fx["team_h"]].setdefault(ev, []).append((fx["team_a"], True))
         upcoming[fx["team_a"]].setdefault(ev, []).append((fx["team_h"], False))
 
-    # Per-player history (needed for form and defcon threshold counts)
+    # Per-player history (needed for form, bonus and defcon rates)
     print("Fetching player histories...")
     histories = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
