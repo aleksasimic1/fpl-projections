@@ -19,8 +19,8 @@ from datetime import datetime, timezone
 # ----------------------------------------------------------------------------
 # Model settings (tweak these)
 # ----------------------------------------------------------------------------
-W_SEASON = 0.80          # weight of season-long rates
-W_FORM = 0.20            # weight of recent form (last FORM_GAMES appearances)
+W_SEASON = 0.75          # weight of season-long rates
+W_FORM = 0.25            # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
 W_XSTAT = 0.75          # weight of xG / xA ...
@@ -31,14 +31,14 @@ FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances belo
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
 OPP_EXPONENT = 0.5       # square root keeps the opponent effect mild
-OPP_MIN, OPP_MAX = 0.4, 1.2
+OPP_MIN, OPP_MAX = 0.35, 1.35
 HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
 
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 3, "DEF": 3, "MID": 0.65, "FWD": 0}
-BONUS_PTS = 1             # history bonus is already recorded as actual FPL bonus points
+BONUS_PTS = 0             # history bonus is already recorded as actual FPL bonus points
 DEFCON_PTS = 2
 DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
