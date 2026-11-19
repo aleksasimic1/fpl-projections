@@ -19,12 +19,12 @@ from datetime import datetime, timezone
 # ----------------------------------------------------------------------------
 # Model settings (tweak these)
 # ----------------------------------------------------------------------------
-W_SEASON = 0.70          # weight of season-long rates
-W_FORM = 0.30            # weight of recent form (last FORM_GAMES appearances)
+W_SEASON = 0.80          # weight of season-long rates
+W_FORM = 0.20            # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
-W_XSTAT = 0.80           # weight of xG / xA ...
-W_ACTUAL = 0.20          # ... versus actual goals / assists
+W_XSTAT = 0.85           # weight of xG / xA ...
+W_ACTUAL = 0.15          # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
@@ -40,6 +40,7 @@ ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
 BONUS_PTS = 1             # history bonus is already recorded as actual FPL bonus points
 DEFCON_PTS = 2
+DEFCON_MULTIPLIER = 0.75
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -227,7 +228,7 @@ def fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, av
     cs = math.exp(-lam) * CS_PTS[pos]
     gc_penalty = -expected_half_goals_conceded(lam) if pos in ("GK", "DEF") else 0.0
 
-    defcon = prof["dc"] * DEFCON_PTS if pos != "GK" else 0.0
+    defcon = prof["dc"] * DEFCON_PTS * DEFCON_MULTIPLIER if pos != "GK" else 0.0
     saves = (prof["saves90"] * att_mult * boost / 3.0) if pos == "GK" else 0.0
     bonus = prof["bonus"]
 
@@ -329,8 +330,8 @@ def main():
             "team": team_by_id[tid]["short_name"],
             "pos": prof["pos"],
             "opp": opp_label,
-            "next1": round(next1, 2),
-            "next5": round(next5, 2),
+            "next1": round(next1, 1),
+            "next5": round(next5, 1),
             "chance": availability(p),
             "news": p.get("news") or "",
             "fringe": prof["fringe"],
