@@ -31,7 +31,7 @@ FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances belo
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
 OPP_EXPONENT = 0.6       # square root keeps the opponent effect mild
-OPP_MIN, OPP_MAX = 0.2, 1.05
+OPP_MIN, OPP_MAX = 1, 1
 HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
 
