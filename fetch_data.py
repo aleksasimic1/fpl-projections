@@ -30,15 +30,15 @@ APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
-OPP_EXPONENT = 0.8       
+OPP_EXPONENT = 0.8       # 0.5 = square root (mild), 1.0 = full effect
 OPP_MIN, OPP_MAX = 0.75, 1.3
 HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
+CS_TEAM_SHRINK = 0.25    # pull a team's xGC towards the league average for clean sheet odds
 
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
-CS_TEAM_SHRINK = 0.25    # pull a team's xGC towards the league average for clean sheet odds
 DEFCON_PTS = 2
 DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
@@ -238,8 +238,10 @@ def fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, av
     def_mult = clamp((attack[opp_id] / avg_att) ** OPP_EXPONENT)
     boost = HOME_ATTACK_BOOST if home else 1.0
 
-    goals = prof["g90"] * att_mult * boost * GOAL_PTS[pos]
-    assists = prof["a90"] * att_mult * boost * ASSIST_PTS
+    goal_rate = prof["g90"] * att_mult * boost      # expected goals this match
+    assist_rate = prof["a90"] * att_mult * boost    # expected assists this match
+    goals = goal_rate * GOAL_PTS[pos]
+    assists = assist_rate * ASSIST_PTS
 
     team_xgc = (1 - CS_TEAM_SHRINK) * defence[team_id] + CS_TEAM_SHRINK * avg_def
     lam = team_xgc * def_mult * (HOME_CS_FACTOR if home else 1.0)
@@ -268,6 +270,7 @@ def fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, av
         "boost": boost,
         "lambda_conceded": lam,
         "p_clean_sheet": math.exp(-lam),
+        "p_involve": 1 - math.exp(-(goal_rate + assist_rate)),
     }
     return points, info
 
@@ -339,6 +342,17 @@ def main():
             return sum(project_fixture(prof, tid, opp, home, attack, defence, avg_att, avg_def)
                        for opp, home in team_fx.get(ev, []))
 
+        def gw_involvement(ev):
+            """P(at least one goal or assist) in the given GW; None for fringe / no fixture."""
+            if prof["fringe"] or not team_fx.get(ev):
+                return None
+            p_none = 1.0
+            for opp, home in team_fx[ev]:
+                _, info = fixture_components(prof, tid, opp, home, attack, defence, avg_att, avg_def)
+                p_none *= 1 - info["p_involve"]
+            return 1 - p_none
+
+        involve = gw_involvement(next_event)
         next1 = gw_points(next_event)
         next5 = sum(gw_points(ev) for ev in horizon_events)
         opp_label = ", ".join(
@@ -353,6 +367,7 @@ def main():
             "opp": opp_label,
             "next1": round(next1, 1),
             "next5": round(next5, 1),
+            "involve": None if involve is None else round(involve * 100),
             "chance": availability(p),
             "news": p.get("news") or "",
             "fringe": prof["fringe"],

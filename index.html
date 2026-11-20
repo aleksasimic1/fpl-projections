@@ -160,7 +160,7 @@
     <span><span class="swatch" style="background:var(--warn-red)"></span>0% chance of playing</span>
     <span><span class="swatch" style="background:var(--warn-yellow)"></span>Below 100% chance of playing</span>
   </div>
-  <p class="note">Projections assume 90 minutes for every player. Players who averaged under 60 minutes over their last 5 games are given the default 2 points per fixture. Hover over a highlighted name for the injury news.</p>
+  <p class="note">Projections assume 90 minutes for every player. Players who averaged under 60 minutes over their last 5 games are given the default 2 points per fixture and no goal involvement chance. Goal involvement is the chance of at least one goal or assist in the next gameweek. Hover over a highlighted name for the injury news.</p>
 </div>
 
 <script>
@@ -171,7 +171,8 @@
     { key: "pos",   label: "Position",                 type: "pos" },
     { key: "opp",   label: "Next Opponent",            type: "text" },
     { key: "next1", label: "Projected Pts (Next GW)",  type: "num" },
-    { key: "next5", label: "Projected Pts (Next 5 GWs)", type: "num" }
+    { key: "next5", label: "Projected Pts (Next 5 GWs)", type: "num" },
+    { key: "involve", label: "Goal Involvement % (Next GW)", type: "num" }
   ];
   var POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
   var POSITIONS = ["GK", "DEF", "MID", "FWD"];
@@ -250,6 +251,11 @@
   function compare(a, b) {
     var col = COLUMNS.filter(function (c) { return c.key === state.sortKey; })[0];
     var x = a[state.sortKey], y = b[state.sortKey], r;
+    var xNull = x === null || x === undefined, yNull = y === null || y === undefined;
+    if (col.type === "num" && (xNull || yNull)) {
+      if (xNull && yNull) return a.name.localeCompare(b.name);
+      return xNull ? 1 : -1; // missing values always go to the bottom
+    }
     if (col.type === "num") r = x - y;
     else if (col.type === "pos") r = POS_ORDER[x] - POS_ORDER[y];
     else r = String(x).localeCompare(String(y), "en", { sensitivity: "base" });
@@ -272,7 +278,8 @@
       var tr = document.createElement("tr");
       var cells = [
         ["name", p.name], ["", p.team], ["", p.pos], ["", p.opp],
-        ["num next1", p.next1.toFixed(1)], ["num next5", p.next5.toFixed(1)]
+        ["num next1", p.next1.toFixed(1)], ["num next5", p.next5.toFixed(1)],
+        ["num", p.involve === null || p.involve === undefined ? "-" : p.involve + "%"]
       ];
       cells.forEach(function (c, i) {
         var td = document.createElement("td");
