@@ -354,8 +354,7 @@ def main():
         tid = p["team"]
         team_fx = upcoming[tid]
         chance = availability(p)
-        inj = INJURY_NEXT_GW_MULT if chance < 100 else 1.0  # applies to the next GW only
-        inj_next1 = 0.0 if chance == 0 else inj
+        inj = 0.0 if chance == 0 else (INJURY_NEXT_GW_MULT if chance < 100 else 1.0)
 
         def gw_points(ev):
             return sum(project_fixture(prof, tid, opp, home, attack, defence, avg_att, avg_def)
@@ -373,8 +372,8 @@ def main():
 
         involve = gw_involvement(next_event)
         if involve is not None:
-            involve *= inj_next1
-        next1 = gw_points(next_event) * inj_next1
+            involve *= inj
+        next1 = gw_points(next_event) * inj
         next5 = sum(gw_points(ev) * (inj if ev == next_event else 1.0) for ev in horizon_events)
         opp_label = ", ".join(
             f"{team_by_id[opp]['short_name']} ({'H' if home else 'A'})"
