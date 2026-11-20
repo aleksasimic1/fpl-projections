@@ -121,6 +121,7 @@
 <div class="wrap">
   <h1>FPL Points Projections</h1>
   <p class="sub" id="meta">Loading data...</p>
+  <div class="error" id="warn" hidden style="margin-bottom:16px"></div>
 
   <section class="filters" aria-label="Filters">
     <div class="group">
@@ -170,9 +171,9 @@
     { key: "team",  label: "Team",                     type: "text" },
     { key: "pos",   label: "Position",                 type: "pos" },
     { key: "opp",   label: "Next Opponent",            type: "text" },
+    { key: "involve", label: "Goal Involvement % (Next GW)", type: "num" },
     { key: "next1", label: "Projected Pts (Next GW)",  type: "num" },
-    { key: "next5", label: "Projected Pts (Next 5 GWs)", type: "num" },
-    { key: "involve", label: "Goal Involvement % (Next GW)", type: "num" }
+    { key: "next5", label: "Projected Pts (Next 5 GWs)", type: "num" }
   ];
   var POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
   var POSITIONS = ["GK", "DEF", "MID", "FWD"];
@@ -278,8 +279,8 @@
       var tr = document.createElement("tr");
       var cells = [
         ["name", p.name], ["", p.team], ["", p.pos], ["", p.opp],
-        ["num next1", p.next1.toFixed(1)], ["num next5", p.next5.toFixed(1)],
-        ["num", p.involve === null || p.involve === undefined ? "-" : p.involve + "%"]
+        ["num", p.involve === null || p.involve === undefined ? "-" : p.involve + "%"],
+        ["num next1", p.next1.toFixed(1)], ["num next5", p.next5.toFixed(1)]
       ];
       cells.forEach(function (c, i) {
         var td = document.createElement("td");
@@ -304,6 +305,12 @@
 
   function init(data) {
     state.players = data.players;
+    if (!data.players.some(function (p) { return p.involve !== undefined; })) {
+      var warn = document.getElementById("warn");
+      warn.hidden = false;
+      warn.textContent = "This data.json has no goal involvement values. Re-run fetch_data.py " +
+        "(and push the latest fetch_data.py, otherwise the GitHub Action keeps overwriting data.json with the old format).";
+    }
     data.teams.forEach(function (t) { state.teams.add(t); });
 
     var when = new Date(data.generated_at);

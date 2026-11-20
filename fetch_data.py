@@ -26,15 +26,18 @@ FORM_GAMES = 5
 W_XSTAT = 0.6            # weight of xG / xA ...
 W_ACTUAL = 0.4           # ... versus actual goals / assists
 
-APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
-FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
-FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
+APPEARANCE_PTS = 2.0       # points for playing 60+ minutes
+SHORT_APPEARANCE_PTS = 1.0 # points for playing 1-59 minutes
+FRINGE_MIN_AVG = 60        # avg minutes over the last FORM_GAMES appearances below this -> default points
+FRINGE_DEFAULT_PTS = 2.0   # points per fixture for such players
 
-OPP_EXPONENT = 0.99       # 0.5 = square root (mild), 1.0 = full effect
+INJURY_NEXT_GW_MULT = 0.7  # next-GW multiplier for flagged players (chance of playing < 100%)
+
+OPP_EXPONENT = 0.99      # 0.5 = square root (mild), 1.0 = full effect
 OPP_MIN, OPP_MAX = 0.6, 1.4
-HOME_ATTACK_BOOST = 1.15 # home players: +5% on goal/assist/save rates
+HOME_ATTACK_BOOST = 1.15 # home players: +15% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
-CS_TEAM_SHRINK = 0.3    # pull a team's xGC towards the league average for clean sheet odds
+CS_TEAM_SHRINK = 0.3     # pull a team's xGC towards the league average for clean sheet odds
 
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
@@ -45,7 +48,7 @@ DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon po
 
 # Bonus points are noisy on small samples, so they are shrunk towards the
 # position average and only partially counted.
-BONUS_WEIGHT = 0.75       # share of the shrunk bonus rate that counts (0 = off, 1 = full)
+BONUS_WEIGHT = 0.75      # share of the shrunk bonus rate that counts (0 = off, 1 = full)
 BONUS_PRIOR_GAMES = 10   # pseudo-appearances pulling towards the position average
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -212,6 +215,12 @@ def build_profile(p, history, bonus_prior=0.0):
     raw_bonus = blend(season_bonus, form_bonus)
     bonus = BONUS_WEIGHT * (n * raw_bonus + BONUS_PRIOR_GAMES * bonus_prior) / (n + BONUS_PRIOR_GAMES)
 
+    # Expected minutes, from the last FORM_GAMES appearances:
+    #   min_share - share of a full match he plays (scales per-90 stats)
+    #   p60       - chance he plays 60+ minutes (needed for 2 appearance pts and clean sheets)
+    min_share = min(1.0, avg_recent_min / 90.0)
+    p60 = sum(1 for h in recent if h["minutes"] >= 60) / len(recent) if recent else 0.0
+
     return {
         "pos": pos,
         "fringe": avg_recent_min < FRINGE_MIN_AVG,
@@ -220,6 +229,8 @@ def build_profile(p, history, bonus_prior=0.0):
         "saves90": blend(season_saves, form_saves),
         "bonus": bonus,
         "dc": blend(season_dc, form_dc if thr else None),
+        "min_share": min_share,
+        "p60": p60,
     }
 
 
@@ -232,30 +243,35 @@ def fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, av
         return {"fringe_default": FRINGE_DEFAULT_PTS}, {}
 
     pos = prof["pos"]
+    share = prof["min_share"]
+    p60 = prof["p60"]
+
     # Opponent defensive weakness (more xGC per game -> easier to score against)
     att_mult = clamp((defence[opp_id] / avg_def) ** OPP_EXPONENT)
     # Opponent attacking strength (more xG per game -> harder to keep a clean sheet)
     def_mult = clamp((attack[opp_id] / avg_att) ** OPP_EXPONENT)
     boost = HOME_ATTACK_BOOST if home else 1.0
 
-    goal_rate = prof["g90"] * att_mult * boost      # expected goals this match
-    assist_rate = prof["a90"] * att_mult * boost    # expected assists this match
+    # Per-90 rates are scaled by the share of the match he is expected to play
+    goal_rate = prof["g90"] * att_mult * boost * share      # expected goals this match
+    assist_rate = prof["a90"] * att_mult * boost * share    # expected assists this match
     goals = goal_rate * GOAL_PTS[pos]
     assists = assist_rate * ASSIST_PTS
 
     team_xgc = (1 - CS_TEAM_SHRINK) * defence[team_id] + CS_TEAM_SHRINK * avg_def
     lam = team_xgc * def_mult * (HOME_CS_FACTOR if home else 1.0)
-    # All players are assumed to play 90 minutes, so the FPL 60-minute
-    # clean-sheet eligibility condition is automatically satisfied.
-    cs = math.exp(-lam) * CS_PTS[pos]
-    gc_penalty = -expected_half_goals_conceded(lam) if pos in ("GK", "DEF") else 0.0
+    # Clean sheet needs 60+ minutes; conceded-goal penalty only counts goals while he is on the pitch
+    cs = math.exp(-lam) * CS_PTS[pos] * p60
+    gc_penalty = -expected_half_goals_conceded(lam * share) if pos in ("GK", "DEF") else 0.0
 
+    # Defcon and bonus are already per appearance, so they are not scaled by minutes
     defcon = prof["dc"] * DEFCON_PTS * DEFCON_MULTIPLIER if pos != "GK" else 0.0
-    saves = (prof["saves90"] * att_mult * boost / 3.0) if pos == "GK" else 0.0
+    saves = (prof["saves90"] * att_mult * boost * share / 3.0) if pos == "GK" else 0.0
     bonus = prof["bonus"]
+    appearance = APPEARANCE_PTS * p60 + SHORT_APPEARANCE_PTS * (1 - p60)
 
     points = {
-        "appearance": APPEARANCE_PTS,
+        "appearance": appearance,
         "goals": goals,
         "assists": assists,
         "clean_sheet": cs,
@@ -323,7 +339,7 @@ def main():
         upcoming[fx["team_h"]].setdefault(ev, []).append((fx["team_a"], True))
         upcoming[fx["team_a"]].setdefault(ev, []).append((fx["team_h"], False))
 
-    # Per-player history (needed for form, bonus and defcon rates)
+    # Per-player history (needed for form, bonus, minutes and defcon rates)
     print("Fetching player histories...")
     histories = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -337,6 +353,8 @@ def main():
         prof = build_profile(p, histories[p["id"]], priors[POSITIONS[p["element_type"]]])
         tid = p["team"]
         team_fx = upcoming[tid]
+        chance = availability(p)
+        inj = INJURY_NEXT_GW_MULT if chance < 100 else 1.0  # applies to the next GW only
 
         def gw_points(ev):
             return sum(project_fixture(prof, tid, opp, home, attack, defence, avg_att, avg_def)
@@ -353,8 +371,10 @@ def main():
             return 1 - p_none
 
         involve = gw_involvement(next_event)
-        next1 = gw_points(next_event)
-        next5 = sum(gw_points(ev) for ev in horizon_events)
+        if involve is not None:
+            involve *= inj
+        next1 = gw_points(next_event) * inj
+        next5 = sum(gw_points(ev) * (inj if ev == next_event else 1.0) for ev in horizon_events)
         opp_label = ", ".join(
             f"{team_by_id[opp]['short_name']} ({'H' if home else 'A'})"
             for opp, home in team_fx.get(next_event, [])
@@ -368,7 +388,7 @@ def main():
             "next1": round(next1, 1),
             "next5": round(next5, 1),
             "involve": None if involve is None else round(involve * 100),
-            "chance": availability(p),
+            "chance": chance,
             "news": p.get("news") or "",
             "fringe": prof["fringe"],
         })
