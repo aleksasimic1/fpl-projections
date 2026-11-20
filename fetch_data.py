@@ -43,7 +43,7 @@ GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
 DEFCON_PTS = 2
-DEFCON_MULTIPLIER = 0.7
+DEFCON_MULTIPLIER = 0.62
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 # Bonus points are noisy on small samples, so they are shrunk towards the
