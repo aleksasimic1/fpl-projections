@@ -23,29 +23,29 @@ W_SEASON = 0.8           # weight of season-long rates
 W_FORM = 0.2             # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
-W_XSTAT = 0.8            # weight of xG / xA ...
-W_ACTUAL = 0.2           # ... versus actual goals / assists
+W_XSTAT = 0.6            # weight of xG / xA ...
+W_ACTUAL = 0.4           # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
-OPP_EXPONENT = 0.8       # 0.5 = square root (mild), 1.0 = full effect
-OPP_MIN, OPP_MAX = 0.75, 1.3
-HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
+OPP_EXPONENT = 0.99       # 0.5 = square root (mild), 1.0 = full effect
+OPP_MIN, OPP_MAX = 0.6, 1.4
+HOME_ATTACK_BOOST = 1.15 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
-CS_TEAM_SHRINK = 0.25    # pull a team's xGC towards the league average for clean sheet odds
+CS_TEAM_SHRINK = 0.3    # pull a team's xGC towards the league average for clean sheet odds
 
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
 DEFCON_PTS = 2
-DEFCON_MULTIPLIER = 0.6
+DEFCON_MULTIPLIER = 0.85
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 # Bonus points are noisy on small samples, so they are shrunk towards the
 # position average and only partially counted.
-BONUS_WEIGHT = 0.5       # share of the shrunk bonus rate that counts (0 = off, 1 = full)
+BONUS_WEIGHT = 0.75       # share of the shrunk bonus rate that counts (0 = off, 1 = full)
 BONUS_PRIOR_GAMES = 10   # pseudo-appearances pulling towards the position average
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}

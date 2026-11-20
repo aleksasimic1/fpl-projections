@@ -72,7 +72,7 @@ def main(names):
                     print("\nAll fixtures in horizon:")
                 if info:
                     print(f"  {label:<22} total {total:5.2f} | att mult {info['att_mult']:.2f} | "
-                          f"CS {info['p_clean_sheet']:.0%}")
+                          f"CS {info['p_clean_sheet']:.0%} | G+A {info['p_involve']:.0%}")
                 else:
                     print(f"  {label:<22} total {total:5.2f} | fringe default")
             print(f"  Sum over {len(my_fx)} fixtures: {running:.2f}")
