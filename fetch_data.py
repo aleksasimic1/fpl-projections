@@ -38,6 +38,7 @@ HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chanc
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
+CS_TEAM_SHRINK = 0.25    # pull a team's xGC towards the league average for clean sheet odds
 DEFCON_PTS = 2
 DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
@@ -240,7 +241,8 @@ def fixture_components(prof, team_id, opp_id, home, attack, defence, avg_att, av
     goals = prof["g90"] * att_mult * boost * GOAL_PTS[pos]
     assists = prof["a90"] * att_mult * boost * ASSIST_PTS
 
-    lam = defence[team_id] * def_mult * (HOME_CS_FACTOR if home else 1.0)
+    team_xgc = (1 - CS_TEAM_SHRINK) * defence[team_id] + CS_TEAM_SHRINK * avg_def
+    lam = team_xgc * def_mult * (HOME_CS_FACTOR if home else 1.0)
     # All players are assumed to play 90 minutes, so the FPL 60-minute
     # clean-sheet eligibility condition is automatically satisfied.
     cs = math.exp(-lam) * CS_PTS[pos]
