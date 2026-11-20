@@ -30,21 +30,21 @@ APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
-OPP_EXPONENT = 0.6       # square root keeps the opponent effect mild
-OPP_MIN, OPP_MAX = 0.5, 1.5
+OPP_EXPONENT = 0.5      
+OPP_MIN, OPP_MAX = 0.85, 1.15
 HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
 
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
-CS_PTS = {"GK": 3, "DEF": 3, "MID": 0.65, "FWD": 0}
-BONUS_PTS = 0.3             # history bonus is already recorded as actual FPL bonus points
+CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
+BONUS_PTS = 0             # history bonus is already recorded as actual FPL bonus points
 DEFCON_PTS = 2
 DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-HORIZON = 20              # number of gameweeks for the long projection
+HORIZON = 3            # number of gameweeks for the long projection
 
 BASE = "https://fantasy.premierleague.com/api"
 HEADERS = {"User-Agent": "Mozilla/5.0 (fpl-projection-model)"}
