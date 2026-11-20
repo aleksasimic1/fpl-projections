@@ -19,18 +19,18 @@ from datetime import datetime, timezone
 # ----------------------------------------------------------------------------
 # Model settings (tweak these)
 # ----------------------------------------------------------------------------
-W_SEASON = 0.8          # weight of season-long rates
-W_FORM = 0.2            # weight of recent form (last FORM_GAMES appearances)
+W_SEASON = 0.8           # weight of season-long rates
+W_FORM = 0.2             # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
-W_XSTAT = 0.8          # weight of xG / xA ...
-W_ACTUAL = 0.2        # ... versus actual goals / assists
+W_XSTAT = 0.8            # weight of xG / xA ...
+W_ACTUAL = 0.2           # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
 FRINGE_DEFAULT_PTS = 2.0 # points per fixture for such players
 
-OPP_EXPONENT = 0.5      
+OPP_EXPONENT = 0.5       # square root keeps the opponent effect mild
 OPP_MIN, OPP_MAX = 0.85, 1.15
 HOME_ATTACK_BOOST = 1.05 # home players: +5% on goal/assist/save rates
 HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chance)
@@ -38,13 +38,17 @@ HOME_CS_FACTOR = 0.95    # home team concedes ~5% less (higher clean sheet chanc
 GOAL_PTS = {"GK": 10, "DEF": 6, "MID": 5, "FWD": 4}
 ASSIST_PTS = 3
 CS_PTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
-BONUS_PTS = 0             # history bonus is already recorded as actual FPL bonus points
 DEFCON_PTS = 2
 DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
+# Bonus points are noisy on small samples, so they are shrunk towards the
+# position average and only partially counted.
+BONUS_WEIGHT = 0.5       # share of the shrunk bonus rate that counts (0 = off, 1 = full)
+BONUS_PRIOR_GAMES = 10   # pseudo-appearances pulling towards the position average
+
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-HORIZON = 5            # number of gameweeks for the long projection
+HORIZON = 5              # number of gameweeks for the long projection
 
 BASE = "https://fantasy.premierleague.com/api"
 HEADERS = {"User-Agent": "Mozilla/5.0 (fpl-projection-model)"}
@@ -101,6 +105,18 @@ def expected_half_goals_conceded(lam, kmax=12):
     return total
 
 
+def bonus_priors(players):
+    """Average bonus points per 90 by position, from players with real minutes."""
+    tot_bonus = {"GK": 0.0, "DEF": 0.0, "MID": 0.0, "FWD": 0.0}
+    tot_min = {"GK": 0.0, "DEF": 0.0, "MID": 0.0, "FWD": 0.0}
+    for p in players:
+        if p["minutes"] >= 450:
+            pos = POSITIONS[p["element_type"]]
+            tot_bonus[pos] += p["bonus"]
+            tot_min[pos] += p["minutes"]
+    return {k: (tot_bonus[k] / tot_min[k] * 90 if tot_min[k] else 0.0) for k in tot_bonus}
+
+
 # ----------------------------------------------------------------------------
 # Team strength
 # ----------------------------------------------------------------------------
@@ -140,7 +156,7 @@ def build_team_stats(teams, players, fixtures):
 # ----------------------------------------------------------------------------
 # Player profile (per-90 rates, blended season/form)
 # ----------------------------------------------------------------------------
-def build_profile(p, history):
+def build_profile(p, history, bonus_prior=0.0):
     pos = POSITIONS[p["element_type"]]
     minutes = p["minutes"]
 
@@ -148,6 +164,7 @@ def build_profile(p, history):
     s90 = 90.0 / minutes
     season_g = (W_XSTAT * f(p["expected_goals"]) + W_ACTUAL * p["goals_scored"]) * s90
     season_a = (W_XSTAT * f(p["expected_assists"]) + W_ACTUAL * p["assists"]) * s90
+    season_saves = p["saves"] * s90
 
     # Use actual appearances only for season/form appearance-based statistics.
     played = [h for h in history if h["minutes"] > 0]
@@ -180,26 +197,27 @@ def build_profile(p, history):
                   + W_ACTUAL * sum(h["assists"] for h in recent)) * s
         form_saves = sum(h.get("saves", 0) for h in recent) * s
 
-        recent_played = [h for h in recent if h["minutes"] > 0]
-        if thr and recent_played:
+        if thr:
             form_dc = sum(
-                1 for h in recent_played
+                1 for h in recent
                 if h.get("defensive_contribution", 0) >= thr
-            ) / len(recent_played)
+            ) / len(recent)
 
-        if recent_played:
-            form_bonus = (
-                sum(f(h.get("bonus", 0)) for h in recent_played)
-                / len(recent_played)
-            )
+        form_bonus = sum(f(h.get("bonus", 0)) for h in recent) / len(recent)
+
+    # Bonus: blend season/form, then shrink towards the position average
+    # (fewer appearances -> pulled harder towards the average), then scale down.
+    n = len(played)
+    raw_bonus = blend(season_bonus, form_bonus)
+    bonus = BONUS_WEIGHT * (n * raw_bonus + BONUS_PRIOR_GAMES * bonus_prior) / (n + BONUS_PRIOR_GAMES)
 
     return {
         "pos": pos,
         "fringe": avg_recent_min < FRINGE_MIN_AVG,
         "g90": blend(season_g, form_g),
         "a90": blend(season_a, form_a),
-        "saves90": blend(season_saves := p["saves"] * s90, form_saves),
-        "bonus": blend(season_bonus, form_bonus),
+        "saves90": blend(season_saves, form_saves),
+        "bonus": bonus,
         "dc": blend(season_dc, form_dc if thr else None),
     }
 
@@ -289,6 +307,7 @@ def main():
     horizon_events = list(range(next_event, min(next_event + HORIZON, 38) + 1))[:HORIZON]
 
     attack, defence, avg_att, avg_def = build_team_stats(teams, bootstrap["elements"], fixtures)
+    priors = bonus_priors(bootstrap["elements"])
 
     # Upcoming fixtures per team: {team_id: {event: [(opp_id, home), ...]}}
     upcoming = {t["id"]: {} for t in teams}
@@ -310,7 +329,7 @@ def main():
 
     rows = []
     for p in players:
-        prof = build_profile(p, histories[p["id"]])
+        prof = build_profile(p, histories[p["id"]], priors[POSITIONS[p["element_type"]]])
         tid = p["team"]
         team_fx = upcoming[tid]
 
