@@ -9,8 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f3f5f2;
-    --surface: #ffffff;
+    --bg: #93cddb7e;
+    --surface: #ffffffd8;
     --ink: #17231c;
     --muted: #5d6b62;
     --line: #dde3dd;
@@ -141,7 +141,10 @@
       <div class="checks" id="pos-checks"></div>
     </div>
   </section>
-
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--warn-red)"></span>0% chance of playing</span>
+    <span><span class="swatch" style="background:var(--warn-yellow)"></span>Below 100% chance of playing</span>
+  </div>
   <div class="toolbar">
     <input type="search" id="search" placeholder="Search player name" aria-label="Search player name">
     <span class="count" id="count"></span>
@@ -157,11 +160,7 @@
     <div class="empty" id="empty" hidden>No players match the current filters.</div>
   </div>
 
-  <div class="legend">
-    <span><span class="swatch" style="background:var(--warn-red)"></span>0% chance of playing</span>
-    <span><span class="swatch" style="background:var(--warn-yellow)"></span>Below 100% chance of playing</span>
-  </div>
-  <p class="note">Projections assume 90 minutes for every player. Players who averaged under 60 minutes over their last 5 games are given the default 2 points per fixture and no goal involvement chance. Goal involvement is the chance of at least one goal or assist in the next gameweek. Hover over a highlighted name for the injury news.</p>
+  
 </div>
 
 <script>
