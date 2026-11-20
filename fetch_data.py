@@ -19,8 +19,8 @@ from datetime import datetime, timezone
 # ----------------------------------------------------------------------------
 # Model settings (tweak these)
 # ----------------------------------------------------------------------------
-W_SEASON = 0.8           # weight of season-long rates
-W_FORM = 0.2             # weight of recent form (last FORM_GAMES appearances)
+W_SEASON = 0.9           # weight of season-long rates
+W_FORM = 0.1             # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
 W_XSTAT = 0.6            # weight of xG / xA ...
