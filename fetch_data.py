@@ -23,8 +23,8 @@ W_SEASON = 0.8          # weight of season-long rates
 W_FORM = 0.2            # weight of recent form (last FORM_GAMES appearances)
 FORM_GAMES = 5
 
-W_XSTAT = 0.65          # weight of xG / xA ...
-W_ACTUAL = 0.35        # ... versus actual goals / assists
+W_XSTAT = 0.8          # weight of xG / xA ...
+W_ACTUAL = 0.2        # ... versus actual goals / assists
 
 APPEARANCE_PTS = 2.0     # we assume everyone plays 90 minutes
 FRINGE_MIN_AVG = 60      # avg minutes over the last FORM_GAMES appearances below this -> default points
@@ -44,7 +44,7 @@ DEFCON_MULTIPLIER = 0.6
 DEFCON_THRESHOLD = {"DEF": 10, "MID": 12, "FWD": 12}  # GKs do not get defcon points
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-HORIZON = 3            # number of gameweeks for the long projection
+HORIZON = 5            # number of gameweeks for the long projection
 
 BASE = "https://fantasy.premierleague.com/api"
 HEADERS = {"User-Agent": "Mozilla/5.0 (fpl-projection-model)"}
